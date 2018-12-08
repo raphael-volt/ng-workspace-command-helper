@@ -51,7 +51,7 @@ describe('ng-helper', () => {
         })
 
         it('should link to dist', done => {
-            libGen.linkkDist(TEST_LIB).subscribe(
+            libGen.linkDist(TEST_LIB).subscribe(
                 sucsess => {
                     let tsc = fs.readJSONSync("tsconfig.json")
                     chai.expect(tsc.compilerOptions.paths[TEST_LIB][0]).eq("dist/" + TEST_LIB)
