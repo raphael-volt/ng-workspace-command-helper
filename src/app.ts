@@ -18,9 +18,18 @@ export class App {
         commander.command("new [library]")
             .description("Create an angular library.")
             .action(this.createLib)
+
         commander.command("rm [library]")
             .description("Delete an angular library.")
             .action(this.deleteLib)
+
+        commander.command("linksrc [library]")
+            .description("Update tsconfig.json to link library to his source dircetory.")
+            .action(this.linkSrc)
+
+        commander.command("linkdest [library]")
+            .description("Update tsconfig.json to link library to his dest dircetory.")
+            .action(this.linkDist)
 
         commander.parse(process.argv)
     }
@@ -29,9 +38,25 @@ export class App {
         const lg: LibGenerator = new LibGenerator()
         lg.check().subscribe(
             success => {
-                lg.linkkDist(name).subscribe(
+                lg.linkDist(name).subscribe(
                     success => {
-                        log("Library link changed to dist", ThemeColors.info)
+                        log("Library link changed to dest", ThemeColors.info)
+                        this.exit()
+                    },
+                    this.exitError
+                )
+            },
+            this.exitError
+        )
+    }
+
+    private linkSrc = (name) => {
+        const lg: LibGenerator = new LibGenerator()
+        lg.check().subscribe(
+            success => {
+                lg.linkSource(name).subscribe(
+                    success => {
+                        log("Library link changed to sources", ThemeColors.info)
                         this.exit()
                     },
                     this.exitError
@@ -297,7 +322,7 @@ export class LibGenerator {
         return true
     }
 
-    linkkDist(libName: string) {
+    linkDist(libName: string) {
         return Observable.create((o: Observer<boolean>) => {
             const canEdit = this.canEditLib(libName)
             if (typeof canEdit == "string")
@@ -322,22 +347,22 @@ export class LibGenerator {
         fs.writeJSONSync(TS_JSON, tsj, JSON_CONF)
     }
 
-    
+
     linkSource(libName: string) {
         return Observable.create((o: Observer<boolean>) => {
             const canEdit = this.canEditLib(libName)
             if (typeof canEdit == "string")
-            return o.error(canEdit)
-            
+                return o.error(canEdit)
+
             this.cdProject()
             this._linkSource(libName)
             this.restoreCwd()
-            
+
             o.next(true)
             o.complete()
         })
     }
-    
+
     private _linkSource(libName: string) {
         const entryFile = this.getEntryFile(libName)
         let tsj = this.tsJson
@@ -345,7 +370,7 @@ export class LibGenerator {
         delete (tsj.compilerOptions.paths[libName + "/*"])
         fs.writeJSONSync(TS_JSON, tsj, JSON_CONF)
     }
-    
+
     private getEntryFile(libName: string): string {
         const j = this.ngJson
         const lib = j.projects[libName]
