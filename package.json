@@ -12,7 +12,8 @@
         "build": "npm run clean && tsc --pretty",
         "test": "npm run build && mocha --no-timeouts --compilers ts:ts-node/register --recursive test/**/*.spec.ts",
         "watch:build": "nodemon --config nodemon.json --exec npm run build",
-        "watch:test": "nodemon --config nodemon.json --exec npm run test"
+        "watch:test": "nodemon --config nodemon.json --exec npm run test",
+        "kill-demon": "nodemon -h"
     },
     "author": {
         "name": "raphael-volt",
