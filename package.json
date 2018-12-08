@@ -12,7 +12,8 @@
         "build": "npm run clean && tsc --pretty",
         "test": "npm run build && mocha --no-timeouts --compilers ts:ts-node/register --recursive test/**/*.spec.ts",
         "watch:build": "nodemon --config nodemon.json --exec npm run build",
-        "watch:test": "nodemon --config nodemon.json --exec npm run test"
+        "watch:test": "nodemon --config nodemon.json --exec npm run test",
+        "kill-demon": "nodemon -h"
     },
     "author": {
         "name": "raphael-volt",
@@ -37,7 +38,7 @@
         "@types/rimraf": "^2.0.2",
         "@types/sinon": "^2.3.0",
         "chai": "^4.0.2",
-        "mocha": "^3.4.2",
+        "mocha": "^5.2.0",
         "nodemon": "^1.11.0",
         "rimraf": "^2.6.2",
         "sinon": "^2.3.6"

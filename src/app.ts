@@ -11,8 +11,11 @@ enum ThemeColors { none, silly, input, verbose, prompt, info, data, help, warn, 
 export class App {
 
     public initialize() {
+        
+        const pkg = fs.readJsonSync(path.resolve(__dirname, "..", "package.json"))
+
         commander
-            .version('0.0.1')
+            .version(pkg.version)
             .description('angular/cli helper.')
 
         commander.command("new [library]")
