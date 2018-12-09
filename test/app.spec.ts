@@ -1,12 +1,14 @@
 import * as chai from 'chai';
 import { join, resolve, basename, extname, normalize } from "path";
-import { LibGenerator } from "../src/app";
+import { LibraryController } from "../src/core/library-controller";
 import * as fs from 'fs-extra'
-let libGen: LibGenerator
+// const semver = require('semver')
+import * as SemVer from "semver";
+let libGen: LibraryController
 const TEST_LIB: string = "test-lib"
 
 describe('ng-helper', () => {
-    describe('string', () => {
+    describe.skip('string', () => {
         it('should remove ext of file path', () => {
             const str = "src/public_api.ts"
             const ex = extname(str)
@@ -21,9 +23,27 @@ describe('ng-helper', () => {
             chai.expect(normalize(join(root, rel))).eq("dist/fake")
         })
     })
-    describe("LibGenerator", () => {
+    describe("Build", () => {
+        it("should build all libraries", done => {
+            process.chdir(resolve(__dirname, "..", "tests", "sample"))
+            const lc: LibraryController = new LibraryController()
+            lc.check().subscribe(
+                success => {
+                    lc.buildAll().subscribe(
+                        lib => {
+
+                        },
+                        done,
+                        () => done()
+                    )
+                },
+                done
+            )
+        })
+    })
+    describe.skip("LibGenerator", () => {
         it('should create LibGenerator', () => {
-            libGen = new LibGenerator()
+            libGen = new LibraryController()
             chai.expect(libGen).not.to.be.undefined
         })
         it('should check angular project', done => {

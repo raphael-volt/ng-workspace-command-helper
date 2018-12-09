@@ -1,22 +1,25 @@
 import * as commander from 'commander'
-import * as cp from 'child_process'
-import { Observable, Observer } from "rxjs";
-import * as colors from 'colors'
-import * as fs from 'fs-extra'
-import * as path from 'path'
-import * as rimraf from "rimraf";
-
-enum ThemeColors { none, silly, input, verbose, prompt, info, data, help, warn, debug, error, bold }
+import { readJsonSync } from 'fs-extra'
+import { resolve } from 'path'
+import { LibraryController } from "./core/library-controller";
+import { ThemeColors, log } from "./core/log";
 
 export class App {
 
     public initialize() {
-        
-        const pkg = fs.readJsonSync(path.resolve(__dirname, "..", "package.json"))
+
+        const pkg = readJsonSync(resolve(__dirname, "..", "package.json"))
 
         commander
             .version(pkg.version)
             .description('angular/cli helper.')
+
+
+        commander.command("link [library]")
+            .description("Link one or all libraries.")
+            .action(this.link)
+            .option('-t --type <type>', 'Link type (source|dist|s|d)', /^(source|dist|s|d)$/i)
+            .option('-a --all [all]', 'Build all libraries')
 
         commander.command("new [library]")
             .description("Create an angular library.")
@@ -34,16 +37,57 @@ export class App {
             .description("Update tsconfig.json to link library to his dest dircetory.")
             .action(this.linkDist)
 
+        commander.command("dep [target] [value]")
+            .description("Add value to target peer dependencies.")
+            .action(this.addDependency)
+
+        commander.command("build")
+            .description("Build all libraries.")
+            .action(this.build)
+
+
         commander.parse(process.argv)
     }
 
+    private link = (...args) => {
+        const n: string = args[0]
+        const t: string | boolean = args[1].type
+        const a: boolean = args[1].all
+        if (a && n != undefined) {
+            log("Argument error: library name provided with --all option", ThemeColors.error)
+            process.exit(1)
+        }
+        if (!a && n == undefined) {
+            log("Argument error: missing library name", ThemeColors.error)
+            process.exit(1)
+        }
+        if (typeof t == "boolean" || ["s", "d", "source", "dist"].indexOf(t) == -1) {
+            log("Argument error: invalide type (source or s, dist or d)", ThemeColors.error)
+            process.exit(1)
+        }
+        const linkSource: boolean = (t == "s" || t == "source")
+        if (!a) {
+            if (linkSource)
+                return this.linkSrc(n)
+            return this.linkDist(n)
+        }
+        const lg: LibraryController = new LibraryController()
+        lg.check().subscribe(
+            success => {
+                lg.linkAll(linkSource ? "source":"dist")
+                log(`Libraries linked to ${linkSource ? "source":"dist"}`, ThemeColors.info)
+            },
+            this.exitError
+        )
+    }
+
     private linkDist = (name) => {
-        const lg: LibGenerator = new LibGenerator()
+        const lg: LibraryController = new LibraryController()
         lg.check().subscribe(
             success => {
                 lg.linkDist(name).subscribe(
                     success => {
-                        log("Library link changed to dest", ThemeColors.info)
+                        log("Library link changed to dist", ThemeColors.info)
                         this.exit()
                     },
                     this.exitError
@@ -52,14 +96,27 @@ export class App {
             this.exitError
         )
     }
-
+    private build = () => {
+        const lg: LibraryController = new LibraryController()
+        lg.check().subscribe(
+            success => {
+                lg.buildAll().subscribe(
+                    lib => {
+                        log(lib.root + " build complete")
+                    },
+                    this.exit
+                )
+            },
+            this.exit
+        )
+    }
     private linkSrc = (name) => {
-        const lg: LibGenerator = new LibGenerator()
+        const lg: LibraryController = new LibraryController()
         lg.check().subscribe(
             success => {
                 lg.linkSource(name).subscribe(
                     success => {
-                        log("Library link changed to sources", ThemeColors.info)
+                        log("Library link changed to source", ThemeColors.info)
                         this.exit()
                     },
                     this.exitError
@@ -70,7 +127,7 @@ export class App {
     }
 
     private deleteLib = (name: string) => {
-        const lg: LibGenerator = new LibGenerator()
+        const lg: LibraryController = new LibraryController()
         lg.check().subscribe(
             success => {
                 lg.deleteLib(name).subscribe(
@@ -85,13 +142,13 @@ export class App {
         )
     }
 
-    private exitError(err) {
+    private exitError = (err) => {
         log(err, ThemeColors.error)
         this.exit(false)
     }
 
     private createLib = (name: string) => {
-        let lg: LibGenerator = new LibGenerator()
+        let lg: LibraryController = new LibraryController()
         lg.check().subscribe(
             success => {
                 lg.create(name)
@@ -107,279 +164,25 @@ export class App {
         )
     }
 
-    private exit(success: boolean = true) {
+    private addDependency = (target: string, value: string) => {
+        let lg: LibraryController = new LibraryController()
+        lg.check().subscribe(
+            success => {
+                lg.addPeerDependency(target, value)
+                    .subscribe(
+                        success => {
+                            log("Peer dependecy added", ThemeColors.info)
+                            this.exit()
+                        },
+                        this.exitError
+                    )
+            },
+            this.exitError
+        )
+    }
+
+    private exit = (success: boolean = true) => {
         process.exit(success ? 0 : 1)
     }
 }
 
-colors.setTheme({
-    silly: 'rainbow',
-    input: 'grey',
-    verbose: 'cyan',
-    prompt: 'grey',
-    info: 'green',
-    data: 'grey',
-    help: 'cyan',
-    warn: 'yellow',
-    debug: 'blue',
-    error: 'red'
-})
-interface ITSConfig {
-    compilerOptions: {
-        paths: {
-            [name: string]: string[]
-        }
-    }
-}
-const log = (message: string, color: ThemeColors = ThemeColors.none) => {
-    console.log(logMessage(message, color))
-}
-
-const logMessage = (message: string, color: ThemeColors): string => {
-    if (color != ThemeColors.none) {
-        const prop: string = ThemeColors[color]
-        const fn: (message: string) => string = colors[prop]
-        return fn(message)
-    }
-    return message
-}
-
-const exec = (command: string, logCommand: boolean = false, logOut: boolean = false): Observable<string> => {
-    return Observable.create((observer: Observer<string>) => {
-        if (logCommand)
-            log(logMessage(`> ${command}`, ThemeColors.debug), ThemeColors.bold)
-        let child: cp.ChildProcess = cp.exec(command, (err: Error, strOut: string, stdErr: string) => {
-            if (err) {
-                log(err.name + " " + err.message, ThemeColors.bold)
-                return observer.error(err)
-            }
-            if (logOut)
-                log(strOut, ThemeColors.prompt)
-            observer.next(strOut)
-            child.stdin.end()
-            observer.complete()
-        })
-    })
-}
-
-const findRecurse = (filename: string, dir: string): string => {
-    let fn = null
-    const exist = (fn) => {
-        return fs.existsSync(fn)
-    }
-    const check = () => {
-        if (!exist(dir)) {
-            fn = null
-            return
-        }
-        fn = path.resolve(dir, filename)
-        if (exist(fn)) {
-            return
-        }
-        const prev = dir
-        dir = path.resolve(dir, '..')
-        if (prev == dir) {
-            fn = null
-            return
-        }
-        check()
-    }
-    check()
-    return fn
-}
-
-const versionGTOE = (v: string, r0: number, r1: number, r2: number) => {
-    let l: number[] = v.split(".").map(s => +s)
-    if (l[0] < r0)
-        return false
-    else {
-        if (l[0] == r0) {
-            if (l[1] == r1)
-                return l[2] >= r2
-            return true
-        }
-        return true
-    }
-}
-
-const JSON_CONF = {
-    spaces: 2
-}
-
-const NG_JSON = "angular.json"
-const TS_JSON = "tsconfig.json"
-
-export class LibGenerator {
-
-    private cwd: string
-    private ngPath: string
-    private ngAppDir: string
-    private checked: boolean = false
-
-    private ngJson: any
-    private tsJson: ITSConfig
-
-    check(): Observable<boolean> {
-        this.cwd = process.cwd()
-        return Observable.create((o: Observer<Boolean>) => {
-            this.ngPath = findRecurse('angular.json', this.cwd)
-
-            if (this.ngPath) {
-                this.ngAppDir = path.dirname(this.ngPath)
-                const fn = path.join(this.ngAppDir, "node_modules", "@angular", "cli", "package.json")
-                if (!fs.existsSync(fn)) {
-                    return o.error("can't get @angular/cli version")
-                }
-                const pkg = fs.readJSONSync(fn)
-                let version: string = pkg.version
-                if (!versionGTOE(version, 7, 1, 2)) {
-                    return o.error("angular/cli version < 7.1.2")
-                }
-                this.ngJson = fs.readJSONSync(NG_JSON)
-                this.tsJson = fs.readJsonSync(TS_JSON)
-                this.checked = true
-                o.next(true)
-                o.complete()
-            }
-            else {
-                o.error("Angular project not found")
-            }
-        })
-    }
-
-    private libraryExists(libName): boolean {
-        return this.ngJson.projects[libName] !== undefined
-    }
-
-    deleteLib(libName): Observable<boolean> {
-        return Observable.create((o: Observer<boolean>) => {
-            const canEdit = this.canEditLib(libName)
-            if (typeof canEdit == "string")
-                return o.error(canEdit)
-
-            this.cdProject()
-            let j = this.ngJson
-            const lib = j.projects[libName]
-            const libRoot = lib.root
-            delete (j.projects[libName])
-            // update angular.json
-            fs.writeJsonSync(NG_JSON, j, JSON_CONF)
-            j = this.tsJson
-            // delete tsconfig library path
-            delete (j.compilerOptions.paths[libName])
-            delete (j.compilerOptions.paths[libName + "/*"])
-            // update tsconfig.json
-            fs.writeJSONSync(TS_JSON, j, JSON_CONF)
-            // delete library directory
-            rimraf(libRoot, error => {
-                this.restoreCwd()
-                if (error)
-                    return o.error(error)
-                o.next(true)
-                o.complete()
-            })
-        })
-    }
-
-    private cdProject() {
-        this.cwd = process.cwd()
-        process.chdir(this.ngAppDir)
-    }
-    private restoreCwd() {
-        process.chdir(this.cwd)
-    }
-
-    create(libName): Observable<boolean> {
-        return Observable.create((o: Observer<boolean>) => {
-            if (!this.checked)
-                return o.error("Missing angular context")
-            this.cdProject()
-            exec("ng g library " + libName).subscribe(
-                output => {
-                    console.log(output)
-                    // refresh angular.json
-                    this.ngJson = fs.readJSONSync(NG_JSON)
-                    // link tsconfig path to library entry file
-                    this._linkSource(libName)
-                    this.restoreCwd()
-                    o.next(true)
-                    o.complete()
-                }
-            ),
-                err => {
-                    o.error(err)
-                }
-        })
-    }
-
-    private getNgPackageJSON(libName) {
-        const lib = this.ngJson.projects[libName]
-        return fs.readJSONSync(lib.architect.build.options.project)
-    }
-
-    private canEditLib(libName: string): string | boolean {
-        if (!this.checked)
-            return "Missing angular context"
-        if (!this.libraryExists(libName))
-            return "Missing library"
-        return true
-    }
-
-    linkDist(libName: string) {
-        return Observable.create((o: Observer<boolean>) => {
-            const canEdit = this.canEditLib(libName)
-            if (typeof canEdit == "string")
-                return o.error(canEdit)
-
-            this.cdProject()
-            this._linkDist(libName)
-            this.restoreCwd()
-
-            o.next(true)
-            o.complete()
-        })
-    }
-
-    private _linkDist(libName: string) {
-        const libPKG = this.getNgPackageJSON(libName)
-        const lib = this.ngJson.projects[libName]
-        const dest = path.normalize(path.join(lib.root, libPKG.dest))
-        const tsj = this.tsJson
-        tsj.compilerOptions.paths[libName] = [dest]
-        tsj.compilerOptions.paths[libName + "/*"] = [dest + "/*"]
-        fs.writeJSONSync(TS_JSON, tsj, JSON_CONF)
-    }
-
-
-    linkSource(libName: string) {
-        return Observable.create((o: Observer<boolean>) => {
-            const canEdit = this.canEditLib(libName)
-            if (typeof canEdit == "string")
-                return o.error(canEdit)
-
-            this.cdProject()
-            this._linkSource(libName)
-            this.restoreCwd()
-
-            o.next(true)
-            o.complete()
-        })
-    }
-
-    private _linkSource(libName: string) {
-        const entryFile = this.getEntryFile(libName)
-        let tsj = this.tsJson
-        tsj.compilerOptions.paths[libName] = [entryFile]
-        delete (tsj.compilerOptions.paths[libName + "/*"])
-        fs.writeJSONSync(TS_JSON, tsj, JSON_CONF)
-    }
-
-    private getEntryFile(libName: string): string {
-        const j = this.ngJson
-        const lib = j.projects[libName]
-        const libPKG = this.getNgPackageJSON(libName)
-        let entryFile = lib.root + "/" + libPKG.lib.entryFile
-        const ex = path.extname(entryFile)
-        return entryFile.slice(0, entryFile.lastIndexOf(ex))
-    }
-}
