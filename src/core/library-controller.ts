@@ -149,18 +149,18 @@ export class LibraryController {
                 return o.error(canEdit)
 
             this.cdProject()
-            let j = this.ngConfig
-            const lib = j.projects[libName]
+            let ng = this.ngConfig
+            const lib = ng.projects[libName]
             const libRoot = lib.root
-            delete (j.projects[libName])
+            delete (ng.projects[libName])
             // update angular.json
-            saveJson(NG_JSON, j)
+            saveJson(NG_JSON, ng)
             let tj = this.tsConfig
             // delete tsconfig library path
             delete (tj.compilerOptions.paths[libName])
             delete (tj.compilerOptions.paths[libName + "/*"])
             // update tsconfig.json
-            saveJson(TS_JSON, j)
+            saveJson(TS_JSON, tj)
             // delete library directory
             rimraf(libRoot, error => {
                 this.restoreCwd()
