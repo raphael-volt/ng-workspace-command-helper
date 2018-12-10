@@ -98,6 +98,7 @@ interface IAngularConfig {
     defaultProject: string
 
 }
+export type LinkMode = "source" | "dest"
 export class LibraryController {
 
     private cwd: string
@@ -224,21 +225,6 @@ export class LibraryController {
         return true
     }
 
-    linkDist(libName: string) {
-        return Observable.create((o: Observer<boolean>) => {
-            const canEdit = this.canEditLib(libName)
-            if (typeof canEdit == "string")
-                return o.error(canEdit)
-
-            this.cdProject()
-            this._linkDist(libName)
-            this.restoreCwd()
-
-            o.next(true)
-            o.complete()
-        })
-    }
-
     private _linkDist(libName: string, save: boolean = true) {
         const libPKG = this.getNgPackageJSON(libName)
         const lib = this.ngConfig.projects[libName]
@@ -250,22 +236,6 @@ export class LibraryController {
             saveJson(TS_JSON, tsj)
     }
 
-
-    linkSource(libName: string) {
-        return Observable.create((o: Observer<boolean>) => {
-            const canEdit = this.canEditLib(libName)
-            if (typeof canEdit == "string")
-                return o.error(canEdit)
-
-            this.cdProject()
-            this._linkSource(libName)
-            this.restoreCwd()
-
-            o.next(true)
-            o.complete()
-        })
-    }
-
     private _linkSource(libName: string, save: boolean = true) {
         const entryFile = this.getEntryFile(libName)
         let tsj = this.tsConfig
@@ -275,7 +245,29 @@ export class LibraryController {
             saveJson(TS_JSON, tsj)
     }
 
-    linkAll(type: "source" | "dist") {
+    /**
+     * 
+     * @param name 
+     * @param type 
+     * @throws not checked
+     */
+    link(name: string, type: LinkMode) {
+        if (!this.checked)
+            throw new Error("Missing angular context")
+
+        this.cdProject()
+        if (type == "dest")
+            this._linkDist(name)
+        else 
+            this._linkSource(name)
+        this.restoreCwd()
+    }
+    /**
+     * 
+     * @param type 
+     * @throws not checked
+     */
+    linkAll(type: LinkMode) {
         if (!this.checked)
             throw new Error("Missing angular context")
         let libs = this.getLibraries()

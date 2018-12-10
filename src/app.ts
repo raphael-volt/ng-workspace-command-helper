@@ -12,90 +12,55 @@ export class App {
 
         commander
             .version(pkg.version)
-            .description('angular/cli helper.')
+            .description('angular/cli libraries management helpers. Should be used inside an angular workspace (angular/cli version > 7.1.1).')
 
-
-        commander.command("link [library]")
-            .description("Link one or all libraries.")
-            .action(this.link)
-            .option('-t --type <type>', 'Link type (source|dist|s|d)', /^(source|dist|s|d)$/i)
-            .option('-a --all [all]', 'Build all libraries')
-
-        commander.command("new [library]")
-            .description("Create an angular library.")
+        commander
+            .command("new <library>", "Create a library and set link mode to source.")
             .action(this.createLib)
 
-        commander.command("rm [library]")
-            .description("Delete an angular library.")
-            .action(this.deleteLib)
-
-        commander.command("linksrc [library]")
-            .description("Update tsconfig.json to link library to his source dircetory.")
-            .action(this.linkSrc)
-
-        commander.command("linkdest [library]")
-            .description("Update tsconfig.json to link library to his dest dircetory.")
-            .action(this.linkDist)
-
-        commander.command("dep [target] [value]")
-            .description("Add value to target peer dependencies.")
+        commander
+            .command("dep [target] [value]", "Add dependency.")
             .action(this.addDependency)
+        //.on("--help", ()=>console.log("Add value to target peer dependencies (change the ng-package.json file)."))
 
-        commander.command("build")
-            .description("Build all libraries.")
+        commander
+            .command("build", "Build all libraries.")
             .action(this.build)
 
+        commander
+            .command("link [library]", "Change library link mode.")
+            .option('-s --source', 'link to source')
+            .option('-d --dest', 'link to dest')
+            .option('-a --all', 'on all library projects defined in the angular.json file.')
+            .action(this.link)
+        //.on('--help', ()=>console.log("Switch link mode of one or all libraries to their source or dest directory (change the tsconfig.json file).\nThe library name to link (required if the --all option is not set)."))
 
-        commander.parse(process.argv)
+        commander
+            .parse(process.argv)
+
     }
 
     private link = (...args) => {
         const n: string = args[0]
-        const t: string | boolean = args[1].type
-        const a: boolean = args[1].all
-        if (a && n != undefined) {
-            log("Argument error: library name provided with --all option", ThemeColors.error)
-            process.exit(1)
+        const d: boolean = args[1].d === true
+        const s: boolean = args[1].s === true
+        const a: boolean = args[1].a === true
+        if (d && s) {
+            this.exitError("Only one option must be set (--dest or --source)")
         }
-        if (!a && n == undefined) {
-            log("Argument error: missing library name", ThemeColors.error)
-            process.exit(1)
-        }
-        if (typeof t == "boolean" || ["s", "d", "source", "dist"].indexOf(t) == -1) {
-            log("Argument error: invalide type (source or s, dist or d)", ThemeColors.error)
-            process.exit(1)
-        }
-        const linkSource: boolean = (t == "s" || t == "source")
-        if (!a) {
-            if (linkSource)
-                return this.linkSrc(n)
-            return this.linkDist(n)
+        if (n !== undefined && a) {
+            this.exitError("Only one option must be set (library or --all)")
         }
         const lg: LibraryController = new LibraryController()
         lg.check().subscribe(
             success => {
-                lg.linkAll(linkSource ? "source":"dist")
-                log(`Libraries linked to ${linkSource ? "source":"dist"}`, ThemeColors.info)
+                lg.linkAll(s ? "source" : "dest")
+                log(`Libraries linked to ${s ? "source" : "dist"}`, ThemeColors.info)
             },
             this.exitError
         )
     }
 
-    private linkDist = (name) => {
-        const lg: LibraryController = new LibraryController()
-        lg.check().subscribe(
-            success => {
-                lg.linkDist(name).subscribe(
-                    success => {
-                        log("Library link changed to dist", ThemeColors.info)
-                        this.exit()
-                    },
-                    this.exitError
-                )
-            },
-            this.exitError
-        )
-    }
     private build = () => {
         const lg: LibraryController = new LibraryController()
         lg.check().subscribe(
@@ -108,21 +73,6 @@ export class App {
                 )
             },
             this.exit
-        )
-    }
-    private linkSrc = (name) => {
-        const lg: LibraryController = new LibraryController()
-        lg.check().subscribe(
-            success => {
-                lg.linkSource(name).subscribe(
-                    success => {
-                        log("Library link changed to source", ThemeColors.info)
-                        this.exit()
-                    },
-                    this.exitError
-                )
-            },
-            this.exitError
         )
     }
 
