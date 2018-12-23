@@ -1,9 +1,9 @@
 import { Observable, Observer } from "rxjs";
+import { map, catchError } from "rxjs/operators";
 import * as fs from 'fs-extra'
 import * as path from 'path'
 import * as rimraf from "rimraf";
 import { exec } from "./exec";
-import { satisfies } from "semver";
 import { DependenciesResolver } from "./dependency-resolver";
 import { ThemeColors, log, logMessage } from "./log";
 const findRecurse = (filename: string, dir: string): string => {
@@ -116,15 +116,6 @@ export class LibraryController {
 
             if (this.ngPath) {
                 this.ngAppDir = path.dirname(this.ngPath)
-                const fn = path.join(this.ngAppDir, "node_modules", "@angular", "cli", PACKAGE_JSON)
-                if (!fs.existsSync(fn)) {
-                    return o.error("can't get @angular/cli version")
-                }
-                const pkg: INodePackage = fs.readJSONSync(fn)
-                let version: string = pkg.version
-                if (!satisfies(version, ">=7.1.2")) {
-                    return o.error("angular/cli version < 7.1.2")
-                }
                 this.ngConfig = fs.readJSONSync(NG_JSON)
                 this.tsConfig = fs.readJsonSync(TS_JSON)
                 this.checked = true
@@ -137,6 +128,9 @@ export class LibraryController {
         })
     }
 
+    hasLibrary(name: string): boolean {
+        return (this.checked && this.libraryExists(name))
+    }
     private libraryExists(libName): boolean {
         let lib = this.ngConfig.projects[libName]
         return (lib !== undefined && lib.projectType == TYPE_LIBRARY)
@@ -258,7 +252,7 @@ export class LibraryController {
         this.cdProject()
         if (type == "dest")
             this._linkDist(name)
-        else 
+        else
             this._linkSource(name)
         this.restoreCwd()
     }
@@ -333,17 +327,27 @@ export class LibraryController {
                     return o.complete()
                 }
                 const name = libNames.shift()
-                exec("ng build " + name, true, false).subscribe(
-                    output => {
-                        log(logMessage("✓", ThemeColors.info) + " Built " + name)
+                this.buildLibrary(name)
+                    .subscribe(success => {
                         o.next(libs[name])
                         next()
                     },
-                    o.error
-                )
+                    o.error)
             }
             next()
         })
+    }
+
+    buildLibrary(name: string): Observable<boolean> {
+        return exec("ng build " + name, true, false)
+            .pipe(
+                map(
+                    output => {
+                        log(logMessage("✓", ThemeColors.info) + " Built " + name)
+                        return true
+                    }
+                )
+            )
     }
 
     private getEntryFile(libName: string): string {

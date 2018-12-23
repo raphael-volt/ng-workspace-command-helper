@@ -12,39 +12,40 @@ export class App {
 
         commander
             .version(pkg.version)
-            .description('angular/cli libraries management helpers. Should be used inside an angular workspace (angular/cli version > 7.1.1).')
 
-        commander
-            .command("new <library>", "Create a library and set link mode to source.")
-            .action(this.createLib)
 
-        commander
-            .command("dep [target] [value]", "Add dependency.")
-            .action(this.addDependency)
-        //.on("--help", ()=>console.log("Add value to target peer dependencies (change the ng-package.json file)."))
-
-        commander
-            .command("build", "Build all libraries.")
-            .action(this.build)
-
-        commander
-            .command("link [library]", "Change library link mode.")
+        commander.command("link [library]")
+            .description("Link one or all libraries.")
+            .action(this.link)
             .option('-s --source', 'link to source')
             .option('-d --dest', 'link to dest')
             .option('-a --all', 'on all library projects defined in the angular.json file.')
-            .action(this.link)
-        //.on('--help', ()=>console.log("Switch link mode of one or all libraries to their source or dest directory (change the tsconfig.json file).\nThe library name to link (required if the --all option is not set)."))
 
-        commander
-            .parse(process.argv)
+        commander.command("new [library]")
+            .description("Create an angular library.")
+            .action(this.createLib)
 
+        commander.command("rm [library]")
+            .description("Delete an angular library.")
+            .action(this.deleteLib)
+
+        commander.command("dep [target] [value]")
+            .description("Add value to target peer dependencies.")
+            .action(this.addDependency)
+
+        commander.command("build [library]")
+            .description("Build one or all libraries.")
+            .action(this.build)
+
+        commander.parse(process.argv)
     }
 
     private link = (...args) => {
         const n: string = args[0]
-        const d: boolean = args[1].d === true
-        const s: boolean = args[1].s === true
-        const a: boolean = args[1].a === true
+        const d: boolean = args[1].dest === true
+        const s: boolean = args[1].source === true
+        const a: boolean = args[1].all === true
+
         if (d && s) {
             this.exitError("Only one option must be set (--dest or --source)")
         }
@@ -52,27 +53,41 @@ export class App {
             this.exitError("Only one option must be set (library or --all)")
         }
         const lg: LibraryController = new LibraryController()
+        const mode = s ? "source" : "dest"
         lg.check().subscribe(
             success => {
-                lg.linkAll(s ? "source" : "dest")
-                log(`Libraries linked to ${s ? "source" : "dist"}`, ThemeColors.info)
+                if (a)
+                    lg.linkAll(mode)
+                else
+                    lg.link(n, mode)
+                log(`Libraries linked to ${mode}`, ThemeColors.info)
             },
             this.exitError
         )
     }
 
-    private build = () => {
+    private build = (name: string, commands: commander.Command) => {
         const lg: LibraryController = new LibraryController()
         lg.check().subscribe(
             success => {
-                lg.buildAll().subscribe(
-                    lib => {
-                        log(lib.root + " build complete")
-                    },
-                    this.exit
-                )
+                if (lg.hasLibrary(name)) {
+                    lg.buildLibrary(name)
+                        .subscribe(
+                            this.exit,
+                            this.exitError
+                        )
+                }
+                else {
+
+                    lg.buildAll().subscribe(
+                        lib => {
+                            log(lib.root + " build complete")
+                        },
+                        this.exitError
+                    )
+                }
             },
-            this.exit
+            this.exitError
         )
     }
 
