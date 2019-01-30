@@ -294,9 +294,9 @@ export class LibraryController {
         })
         if (pkgs.length){
             for(let fn of pkgs) {
-                const pkg: INGPackage = fs.readJSONSync(fn)
+                const pkg: INGSubPackage = fs.readJSONSync(fn)
                 const name = path.dirname(fn)
-                tsj.compilerOptions.paths[`${libName}/${name}`] = [path.join(lib.root, name, pkg.lib.entryFile)]
+                tsj.compilerOptions.paths[`${libName}/${name}`] = [path.join(lib.root, name, pkg.ngPackage.lib.entryFile)]
             }
         }
         this.cdProject()

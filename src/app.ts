@@ -65,11 +65,6 @@ export class App {
         const d: boolean = args[1].dest === true
         const s: boolean = args[1].source === true
         const a: boolean = args[1].all === true
-        console.log(n, {
-            dest: d,
-            source: s,
-            all: a
-        })
 
         if (d && s) {
             this.exitError("Only one option must be set (--dest or --source)")

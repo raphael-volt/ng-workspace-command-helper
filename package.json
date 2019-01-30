@@ -1,6 +1,6 @@
 {
     "name": "ng-workspace-command-helper",
-    "version": "1.1.7",
+    "version": "1.1.8",
     "description": "",
     "private": false,
     "repository": {
@@ -30,6 +30,8 @@
         "dist"
     ],
     "devDependencies": {
+        "@angular-devkit/build-angular": "^0.12.3",
+        "@angular-devkit/build-ng-packagr": "^0.12.3",
         "@types/chai": "^4.0.1",
         "@types/commander": "^2.3.31",
         "@types/find": "^0.2.1",

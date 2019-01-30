@@ -4,6 +4,14 @@
         {
             "type": "node",
             "request": "launch",
+            "name": "Launch Program",
+            "program": "${workspaceFolder}/bin/ngh",
+            "args": ["ls"],
+            "cwd": "${workspaceFolder}/tests/sample"
+        },
+        {
+            "type": "node",
+            "request": "launch",
             "name": "Debug all tests",
             "program": "${workspaceRoot}/node_modules/mocha/bin/_mocha",
             "protocol": "inspector",
