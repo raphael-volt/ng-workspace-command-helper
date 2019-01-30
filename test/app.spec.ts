@@ -8,9 +8,25 @@ import * as SemVer from "semver";
 let libCtrl: LibraryController
 const TEST_LIB: string = "test-lib"
 
+/*
+ * @TODO
+ */
+describe.skip('scoped libs', () => {
 
+    it("should create scoped library", done => {
+        process.chdir(resolve(__dirname, "..", "tests", "sample"))
+        libCtrl = new LibraryController()
+        libCtrl.check().subscribe(
+            success => {
+                libCtrl.createScoped("scoped", "test")
+                chai.expect(fs.existsSync('projects/scoped/test/package.json')).true
+            },
+            done
+        )
+    })
+})
 describe('ng-helper', () => {
-    
+
     describe('string', () => {
 
         it('should remove ext of file path', () => {
@@ -72,13 +88,13 @@ describe('ng-helper', () => {
         it('should build library', (done) => {
             libCtrl = new LibraryController()
             libCtrl.check().subscribe(
-                v=>{
+                v => {
                     exec("ng build " + TEST_LIB)
-                    .subscribe(
-                        v=>{
-                            done()
-                        }, done
-                    )
+                        .subscribe(
+                            v => {
+                                done()
+                            }, done
+                        )
                 }, done
             )
         })

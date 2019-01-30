@@ -18,7 +18,17 @@ export class App {
             .description("Link one or all libraries.")
             .action(this.link)
             .option('-s --source', 'link to source')
-            .option('-d --dest', 'link to dest')
+            .option('-d --dest', 'link to dist')
+            .option('-a --all', 'on all library projects defined in the angular.json file.')
+        commander.command("ls [library]")
+            .description("Link to source for one or all libraries.")
+            .action(this.linkSourceAlias)
+            .option('-a --all', 'on all library projects defined in the angular.json file.')
+        commander.command("ld [library]")
+            .description("Link to dist for one or all libraries.")
+            .action(this.linkDistAlias)
+            .option('-s --source', 'link to source')
+            .option('-d --dest', 'link to dist')
             .option('-a --all', 'on all library projects defined in the angular.json file.')
 
         commander.command("new [library]")
@@ -40,11 +50,24 @@ export class App {
         commander.parse(process.argv)
     }
 
+    private linkSourceAlias = (...args) => {
+        //console.log(args[0], args[1])
+        this.link(args[0], { source: true, all: args[0] == undefined })
+    }
+    private linkDistAlias = (...args) => {
+        this.link(args[0], { dest: true, all: args[0] == undefined })
+    }
+
     private link = (...args) => {
         const n: string = args[0]
         const d: boolean = args[1].dest === true
         const s: boolean = args[1].source === true
         const a: boolean = args[1].all === true
+        console.log(n, {
+            dest: d,
+            source: s,
+            all: a
+        })
 
         if (d && s) {
             this.exitError("Only one option must be set (--dest or --source)")

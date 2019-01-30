@@ -3,10 +3,12 @@ import { map, catchError } from "rxjs/operators";
 import * as fs from 'fs-extra'
 import * as path from 'path'
 import * as rimraf from "rimraf";
+import * as jsonStringify from 'json-stable-stringify'
+import * as find from "find";
 import { exec } from "./exec";
 import { DependenciesResolver } from "./dependency-resolver";
 import { ThemeColors, log, logMessage } from "./log";
-const findRecurse = (filename: string, dir: string): string => {
+const findInParentRecurse = (filename: string, dir: string): string => {
     let fn = null
     const exist = (fn) => {
         return fs.existsSync(fn)
@@ -35,14 +37,16 @@ const findRecurse = (filename: string, dir: string): string => {
 const JSON_CONF = {
     spaces: 2
 }
-
+const keySort = (a, b) => {
+    return a.key < b.key ? -1 : 1;
+}
 const saveJson = (filename: string, value: any) => {
-    fs.writeJSONSync(filename, value, JSON_CONF)
+    fs.writeJSONSync(filename, JSON.parse(jsonStringify(value, keySort)), JSON_CONF)
 }
 
 const NG_JSON = "angular.json"
 const TS_JSON = "tsconfig.json"
-const NG_PACKAGE_JSON = "ng-package.json"
+const PUBLIC_API_TS = "public_api.ts"
 const PACKAGE_JSON = "package.json"
 const TYPE_LIBRARY = "library"
 interface ITSConfig {
@@ -54,7 +58,7 @@ interface ITSConfig {
 }
 
 interface INGPackage {
-    dest: string
+    dest?: string
     lib: {
         entryFile: string
     }
@@ -112,7 +116,7 @@ export class LibraryController {
     check(): Observable<boolean> {
         this.cwd = process.cwd()
         return Observable.create((o: Observer<Boolean>) => {
-            this.ngPath = findRecurse('angular.json', this.cwd)
+            this.ngPath = findInParentRecurse('angular.json', this.cwd)
 
             if (this.ngPath) {
                 this.ngAppDir = path.dirname(this.ngPath)
@@ -174,6 +178,33 @@ export class LibraryController {
         process.chdir(this.cwd)
     }
 
+    createScoped(libName: string, scope: string) {
+        const check = this.canEditLib(libName)
+        if (check !== true)
+            throw new Error(check as string)
+        this.cdProject()
+        const lib = this.ngConfig.projects[libName]
+        const root = lib.root
+        const scopeDir = path.join(root, scope)
+        fs.mkdirpSync(path.join(scopeDir, 'src'))
+        process.chdir(scopeDir)
+        const main: string = `src/${scope}.ts`
+        const apiPath: string = 'src/' + PUBLIC_API_TS
+        fs.writeFileSync(apiPath, `export * from './${scope}'`)
+        fs.writeFileSync(main, `export const ${scope.toUpperCase()} = "${scope}"`)
+        const pkg: INGPackage = {
+            lib: {
+                entryFile: apiPath
+            }
+        }
+        saveJson(PACKAGE_JSON, pkg)
+        this.cdProject()
+        const tsc: ITSConfig = this.tsConfig
+        tsc.compilerOptions.paths[`${libName}/${scope}`] = [path.join(root, scope, apiPath)]
+        saveJson(TS_JSON, tsc)
+
+    }
+
     create(libName): Observable<boolean> {
         return Observable.create((o: Observer<boolean>) => {
             if (!this.checked)
@@ -224,6 +255,18 @@ export class LibraryController {
         const lib = this.ngConfig.projects[libName]
         const dest = path.normalize(path.join(lib.root, libPKG.dest))
         const tsj = this.tsConfig
+        process.chdir(lib.root)
+        let pkgs = find.fileSync(PACKAGE_JSON, '.')
+        pkgs = pkgs.filter(fn => {
+            return fn != PACKAGE_JSON
+        })
+        if (pkgs.length){
+            for(let fn of pkgs) {
+                fn = path.dirname(fn)
+                delete tsj.compilerOptions.paths[`${libName}/${fn}`]
+            }
+        }
+        this.cdProject()
         tsj.compilerOptions.paths[libName] = [dest]
         tsj.compilerOptions.paths[libName + "/*"] = [dest + "/*"]
         if (save)
@@ -231,12 +274,35 @@ export class LibraryController {
     }
 
     private _linkSource(libName: string, save: boolean = true) {
-        const entryFile = this.getEntryFile(libName)
+        const lib = this.ngConfig.projects[libName]
+        let entryFile = this.getEntryFile(libName)
         let tsj = this.tsConfig
         tsj.compilerOptions.paths[libName] = [entryFile]
         delete (tsj.compilerOptions.paths[libName + "/*"])
+
+        process.chdir(lib.root)
+        let pkgs = find.fileSync(PACKAGE_JSON, '.')
+        pkgs = pkgs.filter(fn => {
+            return fn != PACKAGE_JSON
+        })
+        if (pkgs.length){
+            for(let fn of pkgs) {
+                const pkg: INGPackage = fs.readJSONSync(fn)
+                const name = path.dirname(fn)
+                tsj.compilerOptions.paths[`${libName}/${name}`] = [path.join(lib.root, name, pkg.lib.entryFile)]
+            }
+        }
+        this.cdProject()
         if (save)
             saveJson(TS_JSON, tsj)
+    }
+    private getScopedEntryFile(libName: string): string {
+        const j = this.ngConfig
+        const lib = j.projects[libName]
+        const libPKG = this.getNgPackageJSON(libName)
+        let entryFile = lib.root + "/" + libPKG.lib.entryFile
+        const ex = path.extname(entryFile)
+        return entryFile.slice(0, entryFile.lastIndexOf(ex))
     }
 
     /**
@@ -332,7 +398,7 @@ export class LibraryController {
                         o.next(libs[name])
                         next()
                     },
-                    o.error)
+                        o.error)
             }
             next()
         })
