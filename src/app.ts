@@ -31,6 +31,8 @@ export class App {
             .option('-d --dest', 'link to dist')
             .option('-a --all', 'on all library projects defined in the angular.json file.')
 
+        commander.command('sub <library> <name>')
+            .action(this.subPackage)
         commander.command("new [library]")
             .description("Create an angular library.")
             .action(this.createLib)
@@ -133,6 +135,15 @@ export class App {
     private exitError = (err) => {
         log(err, ThemeColors.error)
         this.exit(false)
+    }
+
+    private subPackage = (libName: string, subName: string) => {
+        let lg: LibraryController = new LibraryController()
+        lg.check().subscribe(
+            success => {
+                lg.createScoped(libName, subName)
+            },
+            this.exitError)
     }
 
     private createLib = (name: string) => {
