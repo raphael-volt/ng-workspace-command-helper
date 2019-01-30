@@ -63,6 +63,11 @@ interface INGPackage {
         entryFile: string
     }
 }
+
+interface INGSubPackage {
+    ngPackage: INGPackage
+}
+
 interface INodePackage {
     name?: string
     version?: string
@@ -192,9 +197,11 @@ export class LibraryController {
         const apiPath: string = 'src/' + PUBLIC_API_TS
         fs.writeFileSync(apiPath, `export * from './${scope}'`)
         fs.writeFileSync(main, `export const ${scope.toUpperCase()} = "${scope}"`)
-        const pkg: INGPackage = {
-            lib: {
-                entryFile: apiPath
+        const pkg: INGSubPackage = {
+            ngPackage: {
+                lib: {
+                    entryFile: apiPath
+                }
             }
         }
         saveJson(PACKAGE_JSON, pkg)
