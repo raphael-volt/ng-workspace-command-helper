@@ -8,6 +8,16 @@ import * as find from "find";
 import { exec } from "./exec";
 import { DependenciesResolver } from "./dependency-resolver";
 import { ThemeColors, log, logMessage } from "./log";
+const PATH_SEPARATOR: string = "/"
+const PATH_SEPARATOR_RE = /\\/g
+
+const pathJoin = (...values: string[]) => {
+    return values.join(PATH_SEPARATOR)
+}
+const pathNormalize = (value: string) => {
+    return path.normalize(value).replace(PATH_SEPARATOR_RE, PATH_SEPARATOR)
+}
+
 const findInParentRecurse = (filename: string, dir: string): string => {
     let fn = null
     const exist = (fn) => {
@@ -207,7 +217,7 @@ export class LibraryController {
         saveJson(PACKAGE_JSON, pkg)
         this.cdProject()
         const tsc: ITSConfig = this.tsConfig
-        tsc.compilerOptions.paths[`${libName}/${scope}`] = [path.join(root, scope, apiPath)]
+        tsc.compilerOptions.paths[`${libName}/${scope}`] = [pathJoin(root, scope, apiPath)]
         saveJson(TS_JSON, tsc)
 
     }
@@ -260,7 +270,7 @@ export class LibraryController {
     private _linkDist(libName: string, save: boolean = true) {
         const libPKG = this.getNgPackageJSON(libName)
         const lib = this.ngConfig.projects[libName]
-        const dest = path.normalize(path.join(lib.root, libPKG.dest))
+        const dest = pathNormalize(pathJoin(lib.root, libPKG.dest))
         const tsj = this.tsConfig
         process.chdir(lib.root)
         let pkgs = find.fileSync(PACKAGE_JSON, '.')
@@ -296,7 +306,7 @@ export class LibraryController {
             for(let fn of pkgs) {
                 const pkg: INGSubPackage = fs.readJSONSync(fn)
                 const name = path.dirname(fn)
-                tsj.compilerOptions.paths[`${libName}/${name}`] = [path.join(lib.root, name, pkg.ngPackage.lib.entryFile)]
+                tsj.compilerOptions.paths[`${libName}/${name}`] = [pathJoin(lib.root, name, pkg.ngPackage.lib.entryFile)]
             }
         }
         this.cdProject()
